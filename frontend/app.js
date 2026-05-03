@@ -35,48 +35,8 @@ const recordingIndicator = $('recordingIndicator');
 
 // ─── Init ──────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
-    initAuth();
+    initApp();
 });
-
-function initAuth() {
-    if (localStorage.getItem('chummah_auth') === 'Athish') {
-        $('authContainer').classList.add('hidden');
-        $('app').classList.remove('hidden');
-        initApp();
-    } else {
-        $('authContainer').classList.remove('hidden');
-        $('app').classList.add('hidden');
-        $('loginForm').addEventListener('submit', handleLogin);
-    }
-}
-
-async function handleLogin(e) {
-    e.preventDefault();
-    const user = $('loginUser').value.trim();
-    const pass = $('loginPass').value.trim();
-    
-    try {
-        const res = await fetch(`${API}/login`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username: user, password: pass })
-        });
-        
-        if (res.ok) {
-            localStorage.setItem('chummah_auth', 'Athish');
-            $('authContainer').classList.add('hidden');
-            $('app').classList.remove('hidden');
-            initApp();
-        } else {
-            $('authError').textContent = 'Invalid credentials';
-            $('authError').classList.remove('hidden');
-            $('loginPass').value = '';
-        }
-    } catch (err) {
-        $('authError').textContent = 'Connection failed. Is the backend running?';
-        $('authError').classList.remove('hidden');
-    }
-}
 
 function initApp() {
     initVoice();
