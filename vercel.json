@@ -12,10 +12,6 @@
   ],
   "routes": [
     {
-      "src": "/login",
-      "dest": "/backend/main.py"
-    },
-    {
       "src": "/chat",
       "dest": "/backend/main.py"
     },

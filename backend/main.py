@@ -7,7 +7,6 @@ Run with: uvicorn main:app --reload --port 8000
 import json
 import logging
 import asyncio
-import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -77,24 +76,6 @@ class ChatRequest(BaseModel):
 
 class SessionCreate(BaseModel):
     mode: str = "casual"
-
-class LoginRequest(BaseModel):
-    username: str
-    password: str
-
-
-# ─── Auth ──────────────────────────────────────────────────────────
-
-@app.post("/login")
-async def login(req: LoginRequest):
-    """Authenticate against environment variables."""
-    valid_user = os.environ.get("AUTH_USERNAME")
-    valid_pass = os.environ.get("AUTH_PASSWORD")
-    
-    if req.username == valid_user and req.password == valid_pass:
-        return {"status": "success"}
-    raise HTTPException(status_code=401, detail="Invalid credentials")
-
 
 # ─── Health Check ──────────────────────────────────────────────────
 

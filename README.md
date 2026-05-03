@@ -2,6 +2,8 @@
 
 A fully local, ChatGPT-style English fluency trainer powered by Ollama. Voice in, voice out, real-time grammar & vocabulary corrections.
 
+> **Note:** Authentication has been removed. The app is publicly accessible — no login required.
+
 ## ✨ Features
 
 - **ChatGPT-style UI** — Dark mode, streaming responses, smooth animations
