@@ -50,19 +50,31 @@ function initAuth() {
     }
 }
 
-function handleLogin(e) {
+async function handleLogin(e) {
     e.preventDefault();
     const user = $('loginUser').value.trim();
     const pass = $('loginPass').value.trim();
     
-    if (user === 'Athish' && pass === '2006') {
-        localStorage.setItem('chummah_auth', 'Athish');
-        $('authContainer').classList.add('hidden');
-        $('app').classList.remove('hidden');
-        initApp();
-    } else {
+    try {
+        const res = await fetch(`${API}/login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username: user, password: pass })
+        });
+        
+        if (res.ok) {
+            localStorage.setItem('chummah_auth', 'Athish');
+            $('authContainer').classList.add('hidden');
+            $('app').classList.remove('hidden');
+            initApp();
+        } else {
+            $('authError').textContent = 'Invalid credentials';
+            $('authError').classList.remove('hidden');
+            $('loginPass').value = '';
+        }
+    } catch (err) {
+        $('authError').textContent = 'Connection failed. Is the backend running?';
         $('authError').classList.remove('hidden');
-        $('loginPass').value = '';
     }
 }
 
