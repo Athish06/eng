@@ -5,22 +5,47 @@ Maintains the exact same synchronous API as the previous SQLite layer.
 """
 
 import os
+import logging
 from datetime import datetime
-from pymongo import MongoClient
 from bson.objectid import ObjectId
 from dotenv import load_dotenv
 
 load_dotenv()
 
-MONGO_URL = os.environ.get("mongo_url")
-if not MONGO_URL:
-    raise ValueError("mongo_url not found in .env")
+logger = logging.getLogger("chummah.db")
 
-# Connect to MongoDB
-client = MongoClient(MONGO_URL)
-db = client["eng"]
-sessions_coll = db["sessions"]
-messages_coll = db["messages"]
+# ── Env-var lookup (case-insensitive for Vercel compatibility) ──────
+def _get_mongo_url() -> str | None:
+    """Look up MONGO_URL env var, trying several casings."""
+    for key in ("MONGO_URL", "mongo_url", "Mongo_Url", "MONGODB_URI", "mongodb_uri"):
+        val = os.environ.get(key)
+        if val:
+            return val
+    return None
+
+# ── Lazy client — created on first use, not at import time ──────────
+_client = None
+_db = None
+_sessions_coll = None
+_messages_coll = None
+
+
+def _get_db():
+    """Return (sessions_coll, messages_coll), creating the client lazily."""
+    global _client, _db, _sessions_coll, _messages_coll
+    if _client is None:
+        mongo_url = _get_mongo_url()
+        if not mongo_url:
+            raise RuntimeError(
+                "MongoDB connection URL not found. "
+                "Set MONGO_URL (or mongo_url) in your environment / Vercel env vars."
+            )
+        from pymongo import MongoClient
+        _client = MongoClient(mongo_url, serverSelectionTimeoutMS=5000)
+        _db = _client["eng"]
+        _sessions_coll = _db["sessions"]
+        _messages_coll = _db["messages"]
+    return _sessions_coll, _messages_coll
 
 
 def _format_doc(doc: dict) -> dict:
@@ -36,14 +61,20 @@ def _format_doc(doc: dict) -> dict:
 
 
 def init_db():
-    """Create indexes."""
-    messages_coll.create_index("session_id")
-    messages_coll.create_index("created_at")
-    sessions_coll.create_index("created_at")
+    """Create indexes. Called at startup."""
+    try:
+        sessions_coll, messages_coll = _get_db()
+        messages_coll.create_index("session_id")
+        messages_coll.create_index("created_at")
+        sessions_coll.create_index("created_at")
+        logger.info("MongoDB indexes ensured.")
+    except Exception as e:
+        logger.error(f"init_db failed (non-fatal): {e}")
 
 
 def create_session(mode: str = "casual", title: str | None = None) -> str:
     """Create a new chat session. Returns session ID string."""
+    sessions_coll, _ = _get_db()
     if title is None:
         now = datetime.now().strftime("%b %d, %Y %I:%M %p")
         title = f"New Chat — {now}"
@@ -59,6 +90,7 @@ def create_session(mode: str = "casual", title: str | None = None) -> str:
 
 def update_session_title(session_id: str, title: str):
     """Update session title."""
+    sessions_coll, _ = _get_db()
     sessions_coll.update_one(
         {"_id": ObjectId(session_id)},
         {"$set": {"title": title}}
@@ -73,6 +105,7 @@ def add_message(
     corrections: dict | None = None
 ) -> str:
     """Add a message to a session. Returns message ID string."""
+    _, messages_coll = _get_db()
     doc = {
         "session_id": ObjectId(session_id),
         "role": role,
@@ -87,6 +120,7 @@ def add_message(
 
 def get_sessions() -> list[dict]:
     """Get all sessions, newest first."""
+    sessions_coll, _ = _get_db()
     pipeline = [
         {
             "$lookup": {
@@ -116,6 +150,7 @@ def get_sessions() -> list[dict]:
 
 def get_session(session_id: str) -> dict | None:
     """Get a single session by ID."""
+    sessions_coll, _ = _get_db()
     try:
         session = sessions_coll.find_one({"_id": ObjectId(session_id)})
         return _format_doc(session) if session else None
@@ -125,6 +160,7 @@ def get_session(session_id: str) -> dict | None:
 
 def get_session_messages(session_id: str) -> list[dict]:
     """Get all messages for a session, oldest first."""
+    _, messages_coll = _get_db()
     try:
         messages = list(messages_coll.find({"session_id": ObjectId(session_id)}).sort("created_at", 1))
         return [_format_doc(m) for m in messages]
@@ -134,6 +170,7 @@ def get_session_messages(session_id: str) -> list[dict]:
 
 def get_recent_messages(session_id: str, limit: int = 6) -> list[dict]:
     """Get the last N messages for context window."""
+    _, messages_coll = _get_db()
     try:
         # Get last N messages (newest first)
         messages = list(messages_coll.find({"session_id": ObjectId(session_id)})
@@ -148,6 +185,7 @@ def get_recent_messages(session_id: str, limit: int = 6) -> list[dict]:
 
 def delete_session(session_id: str):
     """Delete a session and all its messages."""
+    sessions_coll, messages_coll = _get_db()
     try:
         messages_coll.delete_many({"session_id": ObjectId(session_id)})
         sessions_coll.delete_one({"_id": ObjectId(session_id)})
@@ -157,4 +195,5 @@ def delete_session(session_id: str):
 
 def get_session_count() -> int:
     """Get total number of sessions."""
+    sessions_coll, _ = _get_db()
     return sessions_coll.count_documents({})

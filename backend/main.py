@@ -1,7 +1,7 @@
 """
 Chummah — FastAPI Backend
 Main application: REST endpoints, SSE streaming, static file serving.
-Run with: uvicorn main:app --reload --port 8000
+Run locally with: uvicorn main:app --reload --port 8000
 """
 
 import json
@@ -30,23 +30,23 @@ logging.basicConfig(
 )
 logger = logging.getLogger("chummah")
 
-# Frontend directory (served as static files)
+# Frontend directory (served as static files — only available when running locally)
 FRONTEND_DIR = Path(__file__).parent.parent / "frontend"
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup and shutdown events."""
-    # Startup
     logger.info("🚀 Chummah starting up...")
-    init_db()
-    logger.info("✅ Database initialized")
-
-    # No model warmup needed for Groq
+    try:
+        init_db()
+        logger.info("✅ Database initialized")
+    except Exception as e:
+        # Non-fatal on Vercel cold start — DB will be lazy-initialized per request
+        logger.warning(f"⚠️  DB init skipped at startup: {e}")
 
     yield
 
-    # Shutdown
     logger.info("👋 Chummah shutting down")
 
 
@@ -57,7 +57,7 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# CORS — allow everything for local development
+# CORS — allow all origins (frontend is served separately on Vercel)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -82,8 +82,15 @@ class SessionCreate(BaseModel):
 @app.get("/health")
 async def health_check():
     """Health check endpoint."""
-    health = await check_health()
-    return health
+    try:
+        health = await check_health()
+        return health
+    except Exception as e:
+        logger.error(f"Health check error: {e}")
+        return JSONResponse(
+            status_code=500,
+            content={"status": "error", "detail": str(e)}
+        )
 
 
 # ─── Chat Endpoint (SSE Streaming) ─────────────────────────────────
@@ -92,7 +99,7 @@ async def health_check():
 async def chat_endpoint(req: ChatRequest):
     """
     Main chat endpoint — streams the response via Server-Sent Events (SSE).
-    
+
     SSE event types:
     - 'token': individual content token (for real-time display)
     - 'corrections': parsed corrections JSON (sent at the end)
@@ -127,7 +134,7 @@ async def chat_endpoint(req: ChatRequest):
 
     # Build conversation context
     history = get_recent_messages(session_id, limit=6)
-    messages = build_messages(req.mode, history[:-1], req.message)  # exclude current msg (already in build_messages)
+    messages = build_messages(req.mode, history[:-1], req.message)
 
     async def event_stream():
         """Generator that yields SSE events."""
@@ -137,7 +144,7 @@ async def chat_endpoint(req: ChatRequest):
             # Send session metadata first
             yield f"event: meta\ndata: {json.dumps({'session_id': session_id, 'user_msg_id': user_msg_id, 'is_new_session': is_new_session})}\n\n"
 
-            # Stream tokens from Ollama
+            # Stream tokens from Groq
             async for token in stream_chat(messages):
                 full_response += token
                 yield f"event: token\ndata: {json.dumps({'token': token})}\n\n"
@@ -228,13 +235,14 @@ async def delete_session_endpoint(session_id: str):
     return {"status": "deleted", "session_id": session_id}
 
 
-# ─── Serve Frontend ────────────────────────────────────────────────
+# ─── Serve Frontend (local dev only) ──────────────────────────────
 
-# Mount static files LAST so API routes take priority
+# Mount static files LAST so API routes take priority.
+# On Vercel the frontend is served separately, so this is skipped gracefully.
 if FRONTEND_DIR.exists():
     app.mount("/", StaticFiles(directory=str(FRONTEND_DIR), html=True), name="frontend")
 else:
-    logger.warning(f"Frontend directory not found: {FRONTEND_DIR}")
+    logger.info(f"Frontend directory not found at {FRONTEND_DIR} — skipping static mount (expected on Vercel)")
 
 
 if __name__ == "__main__":

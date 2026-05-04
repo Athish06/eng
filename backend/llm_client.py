@@ -17,12 +17,20 @@ load_dotenv()
 logger = logging.getLogger("chummah.llm")
 
 # --- Groq Configuration ---
-GROQ_API_KEY = os.environ.get("groq_api_key")
+def _get_groq_key() -> str | None:
+    """Look up Groq API key, trying several casings (Vercel compatibility)."""
+    for key in ("GROQ_API_KEY", "groq_api_key", "Groq_Api_Key"):
+        val = os.environ.get(key)
+        if val:
+            return val
+    return None
+
+GROQ_API_KEY = _get_groq_key()
 GROQ_BASE_URL = "https://api.groq.com/openai/v1"
 GROQ_MODEL = "llama-3.3-70b-versatile"  # Extremely fast and smart
 
 if not GROQ_API_KEY:
-    logger.error("groq_api_key not found in .env file!")
+    logger.error("Groq API key not found! Set GROQ_API_KEY (or groq_api_key) in env vars.")
 
 
 async def check_health() -> dict:

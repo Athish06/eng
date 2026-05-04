@@ -3,7 +3,10 @@
   "builds": [
     {
       "src": "backend/main.py",
-      "use": "@vercel/python"
+      "use": "@vercel/python",
+      "config": {
+        "maxLambdaSize": "15mb"
+      }
     },
     {
       "src": "frontend/**",
@@ -12,11 +15,11 @@
   ],
   "routes": [
     {
-      "src": "/chat",
+      "src": "/health",
       "dest": "/backend/main.py"
     },
     {
-      "src": "/health",
+      "src": "/chat",
       "dest": "/backend/main.py"
     },
     {
@@ -24,8 +27,12 @@
       "dest": "/backend/main.py"
     },
     {
-      "src": "/(.*)",
+      "src": "/(.*\\.(js|css|html|ico|png|svg|woff|woff2|ttf))",
       "dest": "/frontend/$1"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/frontend/index.html"
     }
   ]
 }
