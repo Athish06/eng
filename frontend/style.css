@@ -42,6 +42,7 @@
 
 html, body {
     height: 100%;
+    height: 100dvh;
     font-family: var(--font);
     background: var(--bg-root);
     color: var(--text-primary);
@@ -59,7 +60,13 @@ textarea { font-family: inherit; font-size: inherit; }
 ::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
 
 /* ─── Layout ─────────────────────────────── */
-.app-container { display: flex; height: 100vh; width: 100vw; }
+.app-container {
+    display: flex;
+    height: 100vh;
+    height: 100dvh;
+    width: 100vw;
+    overflow: hidden;
+}
 
 /* ─── Sidebar ────────────────────────────── */
 .sidebar {
@@ -182,7 +189,9 @@ textarea { font-family: inherit; font-size: inherit; }
     display: flex;
     flex-direction: column;
     min-width: 0;
+    min-height: 0;
     background: var(--bg-root);
+    overflow: hidden;
 }
 
 .mobile-header {
@@ -195,7 +204,14 @@ textarea { font-family: inherit; font-size: inherit; }
 .app-title { flex: 1; text-align: center; font-size: 14px; font-weight: 600; letter-spacing: -0.3px; }
 
 /* ─── Chat ───────────────────────────────── */
-.chat-container { flex: 1; overflow-y: auto; scroll-behavior: smooth; }
+.chat-container {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    scroll-behavior: smooth;
+    min-height: 0;
+    -webkit-overflow-scrolling: touch;
+}
 
 .welcome-screen {
     display: flex;
@@ -397,7 +413,13 @@ textarea { font-family: inherit; font-size: inherit; }
 }
 
 /* ─── Input Bar ──────────────────────────── */
-.input-bar-wrapper { padding: 0 16px 14px; }
+.input-bar-wrapper {
+    padding: 0 16px 14px;
+    flex-shrink: 0;
+    background: var(--bg-root);
+    /* Account for iOS safe area (home indicator) */
+    padding-bottom: max(14px, env(safe-area-inset-bottom, 14px));
+}
 .input-bar {
     max-width: var(--max-w);
     margin: 0 auto;
@@ -516,62 +538,77 @@ textarea { font-family: inherit; font-size: inherit; }
 
 /* ─── Responsive ─────────────────────────── */
 @media (max-width: 768px) {
-    .sidebar { position: fixed; left: 0; top: 0; bottom: 0; transform: translateX(-100%); z-index: 100; width: 80vw; min-width: 240px; max-width: var(--sidebar-w); }
+    /* Sidebar: slide in as overlay */
+    .sidebar {
+        position: fixed;
+        left: 0; top: 0; bottom: 0;
+        height: 100%;
+        height: 100dvh;
+        transform: translateX(-100%);
+        z-index: 100;
+        transition: transform 200ms var(--ease);
+    }
     .sidebar.mobile-open { transform: translateX(0); }
+
+    /* Show mobile header */
     .mobile-header { display: flex; }
 
-    /* Welcome screen — remove large dead space, center content tightly */
-    .welcome-screen {
-        padding: 20px 16px 16px;
-        justify-content: flex-start;
-        padding-top: max(20px, 5vh);
-    }
-    .welcome-logo { margin-bottom: 20px; }
-    .welcome-logo h2 { font-size: 20px; }
-    .logo-icon { width: 48px; height: 48px; border-radius: 12px; margin-bottom: 10px; }
-
-    /* Prompt cards — full-width single column, compact */
+    /* Stack welcome prompts in single column */
     .welcome-prompts {
         grid-template-columns: 1fr;
-        gap: 8px;
         max-width: 100%;
+        padding: 0 4px;
     }
-    .prompt-card { padding: 12px 14px; }
-    .prompt-text { font-size: 13px; }
+    .welcome-screen { padding: 24px 16px; }
 
     /* Messages */
     .message-wrapper { padding: 0 12px; gap: 10px; }
     .message-avatar { width: 24px; height: 24px; font-size: 10px; }
     .message-row { padding: 12px 0 4px; }
 
-    /* Input bar */
+    /* Input bar - always visible at bottom */
+    .input-bar-wrapper {
+        padding: 8px 10px;
+        padding-bottom: max(10px, env(safe-area-inset-bottom, 10px));
+        flex-shrink: 0;
+        background: var(--bg-root);
+        border-top: 1px solid var(--border);
+    }
+    .input-bar {
+        padding: 10px 10px;
+    }
+    /* Increase textarea font size to prevent iOS auto-zoom */
+    .input-wrapper textarea,
+    .auth-card input {
+        font-size: 16px;
+    }
+    /* Hide keyboard shortcut hint on mobile */
     .input-hint { display: none; }
-    .input-bar-wrapper { padding: 0 10px 10px; }
-    .input-bar { padding: 8px 8px; gap: 6px; }
-    .input-wrapper textarea { font-size: 16px; /* Prevents iOS zoom */ }
 
-    /* Input footer */
-    .input-footer { padding: 0 6px; font-size: 10px; }
+    /* Better touch targets for buttons */
+    .mic-btn, .send-btn, .stop-btn {
+        width: 38px;
+        height: 38px;
+    }
+    .hamburger-btn, .new-chat-mobile {
+        padding: 10px;
+    }
 
-    /* Auth */
-    .auth-card { padding: 30px 20px; margin: 0 20px; width: calc(100% - 40px); }
-    .auth-card input { font-size: 16px; /* Prevents iOS zoom */ }
+    /* Auth card */
+    .auth-card {
+        padding: 30px 20px;
+        margin: 0 16px;
+        width: calc(100% - 32px);
+        max-width: 100%;
+    }
 }
 
-/* Extra small screens (< 400px) */
-@media (max-width: 400px) {
-    .welcome-screen { padding: 16px 12px; padding-top: max(12px, 3vh); }
-    .welcome-logo { margin-bottom: 16px; }
+/* Extra small screens (< 380px) */
+@media (max-width: 380px) {
     .welcome-logo h2 { font-size: 18px; }
-    .logo-icon { width: 42px; height: 42px; }
     .welcome-subtitle { font-size: 12px; }
-    .prompt-card { padding: 10px 12px; gap: 8px; }
-    .prompt-icon { width: 24px; height: 24px; }
-    .prompt-text { font-size: 12px; }
-    .message-wrapper { padding: 0 10px; gap: 8px; }
-    .input-bar-wrapper { padding: 0 8px 8px; }
-    .mic-btn, .send-btn, .stop-btn { width: 30px; height: 30px; }
-    .auth-card { padding: 24px 16px; margin: 0 12px; width: calc(100% - 24px); }
+    .prompt-card { padding: 12px; }
+    .input-bar { gap: 4px; padding: 8px; }
 }
 
 /* ─── Auth Screen ────────────────────────── */
