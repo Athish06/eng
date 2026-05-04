@@ -516,18 +516,62 @@ textarea { font-family: inherit; font-size: inherit; }
 
 /* ─── Responsive ─────────────────────────── */
 @media (max-width: 768px) {
-    .sidebar { position: fixed; left: 0; top: 0; bottom: 0; transform: translateX(-100%); z-index: 100; }
+    .sidebar { position: fixed; left: 0; top: 0; bottom: 0; transform: translateX(-100%); z-index: 100; width: 80vw; min-width: 240px; max-width: var(--sidebar-w); }
     .sidebar.mobile-open { transform: translateX(0); }
     .mobile-header { display: flex; }
-    .welcome-prompts { grid-template-columns: 1fr; }
+
+    /* Welcome screen — remove large dead space, center content tightly */
+    .welcome-screen {
+        padding: 20px 16px 16px;
+        justify-content: flex-start;
+        padding-top: max(20px, 5vh);
+    }
+    .welcome-logo { margin-bottom: 20px; }
+    .welcome-logo h2 { font-size: 20px; }
+    .logo-icon { width: 48px; height: 48px; border-radius: 12px; margin-bottom: 10px; }
+
+    /* Prompt cards — full-width single column, compact */
+    .welcome-prompts {
+        grid-template-columns: 1fr;
+        gap: 8px;
+        max-width: 100%;
+    }
+    .prompt-card { padding: 12px 14px; }
+    .prompt-text { font-size: 13px; }
+
+    /* Messages */
     .message-wrapper { padding: 0 12px; gap: 10px; }
     .message-avatar { width: 24px; height: 24px; font-size: 10px; }
     .message-row { padding: 12px 0 4px; }
+
+    /* Input bar */
     .input-hint { display: none; }
     .input-bar-wrapper { padding: 0 10px 10px; }
-    
+    .input-bar { padding: 8px 8px; gap: 6px; }
+    .input-wrapper textarea { font-size: 16px; /* Prevents iOS zoom */ }
+
+    /* Input footer */
+    .input-footer { padding: 0 6px; font-size: 10px; }
+
+    /* Auth */
     .auth-card { padding: 30px 20px; margin: 0 20px; width: calc(100% - 40px); }
-    .auth-card input, .input-wrapper textarea { font-size: 16px; /* Prevents iOS zoom */ }
+    .auth-card input { font-size: 16px; /* Prevents iOS zoom */ }
+}
+
+/* Extra small screens (< 400px) */
+@media (max-width: 400px) {
+    .welcome-screen { padding: 16px 12px; padding-top: max(12px, 3vh); }
+    .welcome-logo { margin-bottom: 16px; }
+    .welcome-logo h2 { font-size: 18px; }
+    .logo-icon { width: 42px; height: 42px; }
+    .welcome-subtitle { font-size: 12px; }
+    .prompt-card { padding: 10px 12px; gap: 8px; }
+    .prompt-icon { width: 24px; height: 24px; }
+    .prompt-text { font-size: 12px; }
+    .message-wrapper { padding: 0 10px; gap: 8px; }
+    .input-bar-wrapper { padding: 0 8px 8px; }
+    .mic-btn, .send-btn, .stop-btn { width: 30px; height: 30px; }
+    .auth-card { padding: 24px 16px; margin: 0 12px; width: calc(100% - 24px); }
 }
 
 /* ─── Auth Screen ────────────────────────── */
