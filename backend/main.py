@@ -4,11 +4,19 @@ Main application: REST endpoints, SSE streaming, static file serving.
 Run locally with: uvicorn main:app --reload --port 8000
 """
 
+import sys
+import os
 import json
 import logging
 import asyncio
 from contextlib import asynccontextmanager
 from pathlib import Path
+
+# ── Ensure the backend directory is on sys.path (required for Vercel) ──
+# Vercel runs main.py but doesn't automatically add its directory to sys.path
+_backend_dir = Path(__file__).parent
+if str(_backend_dir) not in sys.path:
+    sys.path.insert(0, str(_backend_dir))
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware

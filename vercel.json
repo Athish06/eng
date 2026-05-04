@@ -27,7 +27,7 @@
       "dest": "/backend/main.py"
     },
     {
-      "src": "/(.*\\.(js|css|html|ico|png|svg|woff|woff2|ttf))",
+      "src": "/(.*\\.(js|css|html|ico|png|svg|woff|woff2|ttf|json))",
       "dest": "/frontend/$1"
     },
     {
