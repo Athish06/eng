@@ -428,9 +428,9 @@ function buildRecognition(onFinalTranscript) {
     // Show live interim words while the user is still speaking.
     rec.interimResults = true;
 
-    // Ask the engine for its top 3 guesses; we always pick the one with the
-    // highest confidence score rather than blindly taking index 0.
-    rec.maxAlternatives = 3;
+    // The browser's first result (index 0) is always its highest-confidence
+    // guess. maxAlternatives > 1 caused the transcript to be repeated.
+    rec.maxAlternatives = 1;
 
     let finalTranscript = '';
     let silenceTimer = null;
@@ -460,21 +460,11 @@ function buildRecognition(onFinalTranscript) {
         let interim = '';
         for (let i = e.resultIndex; i < e.results.length; i++) {
             const result = e.results[i];
-
+            // result[0] is always the highest-confidence transcript.
             if (result.isFinal) {
-                // Pick the alternative with the highest confidence for accuracy.
-                let best = result[0];
-                for (let a = 1; a < result.length; a++) {
-                    if (result[a].confidence > best.confidence) best = result[a];
-                }
-                finalTranscript += best.transcript;
+                finalTranscript += result[0].transcript;
             } else {
-                // For interim, also use the highest-confidence alternative.
-                let best = result[0];
-                for (let a = 1; a < result.length; a++) {
-                    if (result[a].confidence > best.confidence) best = result[a];
-                }
-                interim = best.transcript;
+                interim = result[0].transcript;
             }
         }
 
