@@ -387,21 +387,61 @@ function mkTyping() {
 }
 
 // ─── Voice ─────────────────────────────────
+
+/**
+ * Check if the Web Speech API is available in this browser.
+ * Returns the constructor or null.
+ */
+function getSpeechRecognitionClass() {
+    return window.SpeechRecognition || window.webkitSpeechRecognition || null;
+}
+
 function initVoice() {
-    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SR) {
+    if (!getSpeechRecognitionClass()) {
         micBtn.title = 'Voice not supported in this browser';
         micBtn.style.opacity = '0.3';
-        return;
     }
+    // Nothing else to do — we create a fresh instance on every mic press.
+}
+
+/**
+ * Build a fresh SpeechRecognition instance each time the user taps the mic.
+ * Re-creating avoids stale internal state in the browser's STT engine that
+ * degrades accuracy over successive recordings.
+ */
+function buildRecognition(onFinalTranscript) {
+    const SR = getSpeechRecognitionClass();
+    if (!SR) return null;
 
     const rec = new SR();
+
+    // ── Accuracy settings ──────────────────────────────────────────────────
+    // en-US gives the best model quality. If users speak Indian English,
+    // 'en-IN' can help — toggling is also an option but en-US tends to be
+    // more accurate overall for non-native speakers as well.
     rec.lang = 'en-US';
+
+    // Continuous mode: keeps the session open across brief pauses so users
+    // can speak full sentences without the mic cutting out mid-utterance.
+    rec.continuous = true;
+
+    // Show live interim words while the user is still speaking.
     rec.interimResults = true;
-    rec.continuous = false; // Single utterance mode — more reliable
-    rec.maxAlternatives = 1;
+
+    // Ask the engine for its top 3 guesses; we always pick the one with the
+    // highest confidence score rather than blindly taking index 0.
+    rec.maxAlternatives = 3;
 
     let finalTranscript = '';
+    let silenceTimer = null;
+
+    const resetSilenceTimer = () => {
+        clearTimeout(silenceTimer);
+        // Auto-stop after 3 s of silence so the session doesn't hang open.
+        silenceTimer = setTimeout(() => {
+            try { rec.stop(); } catch {}
+        }, 3000);
+    };
 
     rec.onstart = () => {
         state.recording = true;
@@ -409,66 +449,99 @@ function initVoice() {
         micBtn.classList.add('recording');
         recordingIndicator.classList.remove('hidden');
         messageInput.placeholder = 'listening...';
+        messageInput.value = '';
+        sendBtn.disabled = true;
+        resetSilenceTimer();
     };
 
     rec.onresult = (e) => {
+        resetSilenceTimer(); // user is still speaking — push the silence timer
+
         let interim = '';
         for (let i = e.resultIndex; i < e.results.length; i++) {
-            const t = e.results[i][0].transcript;
-            if (e.results[i].isFinal) {
-                finalTranscript += t;
+            const result = e.results[i];
+
+            if (result.isFinal) {
+                // Pick the alternative with the highest confidence for accuracy.
+                let best = result[0];
+                for (let a = 1; a < result.length; a++) {
+                    if (result[a].confidence > best.confidence) best = result[a];
+                }
+                finalTranscript += best.transcript;
             } else {
-                interim = t;
+                // For interim, also use the highest-confidence alternative.
+                let best = result[0];
+                for (let a = 1; a < result.length; a++) {
+                    if (result[a].confidence > best.confidence) best = result[a];
+                }
+                interim = best.transcript;
             }
         }
+
+        // Show the running transcript in the input so users can see it live.
         messageInput.value = finalTranscript + interim;
-        sendBtn.disabled = false;
+        sendBtn.disabled = !(finalTranscript + interim).trim();
         autoResize();
     };
 
     rec.onend = () => {
+        clearTimeout(silenceTimer);
         state.recording = false;
         micBtn.classList.remove('recording');
         recordingIndicator.classList.add('hidden');
         messageInput.placeholder = 'say something...';
-        // Don't auto-send. Let user review and click send or tap mic again.
+
+        const text = messageInput.value.trim();
+        sendBtn.disabled = !text;
+        if (text) onFinalTranscript(text);
     };
 
     rec.onerror = (e) => {
+        clearTimeout(silenceTimer);
         console.warn('Speech error:', e.error);
+
+        if (e.error === 'no-speech') {
+            // Silently ignore — onend will fire and clean up.
+            return;
+        }
+
         state.recording = false;
         micBtn.classList.remove('recording');
         recordingIndicator.classList.add('hidden');
-        messageInput.placeholder = 'say something...';
 
         if (e.error === 'not-allowed') {
             messageInput.placeholder = 'microphone blocked — check browser permissions';
-        } else if (e.error === 'no-speech') {
-            messageInput.placeholder = 'no speech detected — try again';
+        } else {
+            messageInput.placeholder = 'say something...';
         }
     };
 
-    state.recognition = rec;
+    return rec;
 }
 
 function toggleMic() {
-    if (!state.recognition) return;
+    if (!getSpeechRecognitionClass()) return;
     if (state.streaming) return; // Don't record while streaming
 
     if (state.recording) {
-        state.recognition.stop();
-    } else {
-        // Request mic permission and start
-        messageInput.value = '';
-        try {
-            state.recognition.start();
-        } catch (e) {
-            // Already started — restart
-            state.recognition.stop();
-            setTimeout(() => {
-                try { state.recognition.start(); } catch {}
-            }, 200);
-        }
+        // User tapped mic again to stop manually.
+        try { state.recognition?.stop(); } catch {}
+        return;
+    }
+
+    // Build a fresh recognition session for best accuracy.
+    state.recognition = buildRecognition((text) => {
+        // Called when the session ends with a non-empty transcript.
+        // Just enable send — user can review before sending.
+        sendBtn.disabled = !text;
+    });
+
+    if (!state.recognition) return;
+
+    try {
+        state.recognition.start();
+    } catch (e) {
+        console.warn('Could not start recognition:', e);
     }
 }
 
